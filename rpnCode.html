@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RPN计算器 - C++代码展示</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <script>
+        // Tailwind配置
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#165DFF',
+                        secondary: '#36CFC9',
+                        dark: '#1D2129',
+                        light: '#F2F3F5',
+                        code: {
+                            bg: '#282C34',
+                            text: '#ABB2BF',
+                            keyword: '#C678DD',
+                            type: '#56B6C2',
+                            string: '#98C379',
+                            comment: '#7F848E',
+                            number: '#D19A66',
+                            function: '#61AFEF'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                        mono: ['Fira Code', 'Consolas', 'monospace']
+                    }
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .code-block {
+                @apply font-mono text-code-text bg-code-bg p-4 rounded-lg overflow-x-auto text-sm md:text-base;
+            }
+            .code-keyword {
+                @apply text-code-keyword;
+            }
+            .code-type {
+                @apply text-code-type;
+            }
+            .code-string {
+                @apply text-code-string;
+            }
+            .code-comment {
+                @apply text-code-comment;
+            }
+            .code-number {
+                @apply text-code-number;
+            }
+            .code-function {
+                @apply text-code-function;
+            }
+            .content-section {
+                @apply mb-8 p-6 bg-white rounded-xl shadow-sm;
+            }
+            .feature-card {
+                @apply p-4 border border-gray-200 rounded-lg hover:shadow-md transition-shadow;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-dark">
+    <!-- 页面头部 -->
+    <header class="bg-white shadow-sm">
+        <div class="container mx-auto px-4 py-6">
+            <h1 class="text-3xl font-bold text-primary">
+                <i class="fa fa-calculator mr-2"></i>C++ RPN计算器
+            </h1>
+            <p class="text-gray-600 mt-2">使用C++实现的逆波兰表示法计算器，支持多种数学运算和栈操作</p>
+        </div>
+    </header>
+
+        <!-- 完整代码 -->
+        <section id="code" class="content-section">
+            <h2 class="text-2xl font-bold mb-4 text-primary">
+                <i class="fa fa-code mr-2"></i>完整C++代码
+            </h2>
+            <div class="code-block">
+<pre><span class="code-include">#include &lt;iostream&gt;</span>
+<span class="code-include">#include &lt;vector&gt;</span>
+<span class="code-include">#include &lt;string&gt;</span>
+<span class="code-include">#include &lt;sstream&gt;</span>
+<span class="code-include">#include &lt;cmath&gt;</span>
+<span class="code-include">#include &lt;stack&gt;</span>
+<span class="code-include">#include &lt;map&gt;</span>
+<span class="code-include">#include &lt;functional&gt;</span>
+<span class="code-include">#include &lt;stdexcept&gt;</span>
+<span class="code-include">#include &lt;iomanip&gt;</span>
+<span class="code-keyword">using</span> <span class="code-keyword">namespace</span> std;
+
+<span class="code-keyword">class</span> <span class="code-type">RPNCalculator</span> {
+<span class="code-keyword">private</span>:
+    std::vector&lt;<span class="code-type">double</span>&gt; stack;
+    std::vector&lt;std::string&gt; history;
+
+    <span class="code-comment">// 数学运算函数映射</span>
+    std::map&lt;std::string, std::function&lt;<span class="code-type">void</span>()&gt;&gt; operations;
+
+    <span class="code-type">void</span> <span class="code-function">initializeOperations</span>() {
+        <span class="code-comment">// 基础四则运算</span>
+        operations[<span class="code-string">"+"</span>] = [<span class="code-keyword">this</span>]() { binaryOp([](<span class="code-type">double</span> a, <span class="code-type">double</span> b) { <span class="code-keyword">return</span> a + b; }); };
+        operations[<span class="code-string">"-"</span>] = [<span class="code-keyword">this</span>]() { binaryOp([](<span class="code-type">double</span> a, <span class="code-type">double</span> b) { <span class="code-keyword">return</span> a - b; }); };
+        operations[<span class="code-string">"*"</span>] = [<span class="code-keyword">this</span>]() { binaryOp([](<span class="code-type">double</span> a, <span class="code-type">double</span> b) { <span class="code-keyword">return</span> a * b; }); };
+        operations[<span class="code-string">"/"</span>] = [<span class="code-keyword">this</span>]() { binaryOp([](<span class="code-type">double</span> a, <span class="code-type">double</span> b) {
+            <span class="code-keyword">if</span> (b == <span class="code-number">0</span>) <span class="code-keyword">throw</span> std::runtime_error(<span class="code-string">"除零错误"</span>);   <span class="code-keyword">return</span> a / b; }); };
+
+        <span class="code-comment">// 高级数学运算</span>
+        operations[<span class="code-string">"sqrt"</span>] = [<span class="code-keyword">this</span>]() { unaryOp([](<span class="code-type">double</span> a) {
+            <span class="code-keyword">if</span> (a &lt; <span class="code-number">0</span>) <span class="code-keyword">throw</span> std::runtime_error(<span class="code-string">"负数不能开平方根"</span>);    <span class="code-keyword">return</span> std::sqrt(a); }); };
+        operations[<span class="code-string">"pow"</span>] = [<span class="code-keyword">this</span>]() { binaryOp([](<span class="code-type">double</span> a, <span class="code-type">double</span> b) { <span class="code-keyword">return</span> std::pow(a, b); }); };
+        operations[<span class="code-string">"sin"</span>] = [<span class="code-keyword">this</span>]() { unaryOp([](<span class="code-type">double</span> a) { <span class="code-keyword">return</span> std::sin(a); }); };
+        operations[<span class="code-string">"cos"</span>] = [<span class="code-keyword">this</span>]() { unaryOp([](<span class="code-type">double</span> a) { <span class="code-keyword">return</span> std::cos(a); }); };
+        operations[<span class="code-string">"tan"</span>] = [<span class="code-keyword">this</span>]() { unaryOp([](<span class="code-type">double</span> a) { <span class="code-keyword">return</span> std::tan(a); }); };
+
+        <span class="code-comment">// 特殊操作符</span>
+        operations[<span class="code-string">"fib"</span>] = [<span class="code-keyword">this</span>]() { fibonacci(); };
+        operations[<span class="code-string">"pascal"</span>] = [<span class="code-keyword">this</span>]() { pascal(); };
+
+        <span class="code-comment">// 栈操作</span>
+        operations[<span class="code-string">"clear"</span>] = [<span class="code-keyword">this</span>]() { stack.clear(); };
+        operations[<span class="code-string">"drop"</span>] = [<span class="code-keyword">this</span>]() { checkStackSize(<span class="code-number">1</span>);  stack.pop_back(); };
+        operations[<span class="code-string">"dup"</span>]  = [<span class="code-keyword">this</span>]() { checkStackSize(<span class="code-number">1</span>);  stack.push_back(stack.back()); };
+        operations[<span class="code-string">"swap"</span>] = [<span class="code-keyword">this</span>]() {
+            checkStackSize(<span class="code-number">2</span>);  std::swap(stack[stack.size() - <span class="code-number">1</span>], stack[stack.size() - <span class="code-number">2</span>]); };
+    }
+
+    <span class="code-type">void</span> <span class="code-function">checkStackSize</span>(size_t required) {      <span class="code-comment">//检查栈中元素个数是否足够</span>
+        <span class="code-keyword">if</span> (stack.size() &lt; required)
+        {    <span class="code-keyword">throw</span> std::runtime_error(<span class="code-string">"栈中元素不足，需要 "</span> + std::to_string(required) + <span class="code-string">" 个元素"</span>);    }
+    }
+
+    <span class="code-type">void</span> <span class="code-function">binaryOp</span>(std::function&lt;<span class="code-type">double</span>(<span class="code-type">double</span>, <span class="code-type">double</span>)&gt; op) {   <span class="code-comment">//取出栈中元素，并将计算结果返回栈中</span>
+        checkStackSize(<span class="code-number">2</span>);                                      <span class="code-comment">//针对需两个操作数的计算</span>
+        <span class="code-type">double</span> b = stack.back(); stack.pop_back();
+        <span class="code-type">double</span> a = stack.back(); stack.pop_back();
+        stack.push_back(op(a, b));
+    }
+
+    <span class="code-type">void</span> <span class="code-function">unaryOp</span>(std::function&lt;<span class="code-type">double</span>(<span class="code-type">double</span>)&gt; op) {            <span class="code-comment">//取出栈中元素，并将计算结果返回栈中</span>
+        checkStackSize(<span class="code-number">1</span>);                                      <span class="code-comment">//针对需一个操作数的计算</span>
+        <span class="code-type">double</span> a = stack.back(); stack.pop_back();
+        stack.push_back(op(a));
+    }
+
+    <span class="code-type">void</span> <span class="code-function">fibonacci</span>() {
+        checkStackSize(<span class="code-number">1</span>);
+        <span class="code-type">int</span> n = static_cast&lt;<span class="code-type">int</span>&gt;(stack.back()); stack.pop_back();
+        <span class="code-keyword">if</span> (n &lt; <span class="code-number">0</span>) <span class="code-keyword">throw</span> std::runtime_error(<span class="code-string">"斐波那契数列索引不能为负数"</span>);
+
+        <span class="code-keyword">if</span> (n == <span class="code-number">0</span>) {
+            stack.push_back(<span class="code-number">0</span>);
+        } <span class="code-keyword">else</span> <span class="code-keyword">if</span> (n == <span class="code-number">1</span>) {
+            stack.push_back(<span class="code-number">1</span>);
+        } <span class="code-keyword">else</span> {
+            <span class="code-type">double</span> a = <span class="code-number">0</span>, b = <span class="code-number">1</span>;
+            <span class="code-keyword">for</span> (<span class="code-type">int</span> i = <span class="code-number">2</span>; i &lt;= n; i++) {
+                <span class="code-type">double</span> temp = a + b;
+                a = b;
+                b = temp;
+            } stack.push_back(b);
+        }
+    }
+
+    <span class="code-type">void</span> <span class="code-function">pascal</span>() {
+        checkStackSize(<span class="code-number">1</span>);
+        <span class="code-type">int</span> n = static_cast&lt;<span class="code-type">int</span>&gt;(stack.back()); stack.pop_back();
+        <span class="code-keyword">if</span> (n &lt; <span class="code-number">0</span>) <span class="code-keyword">throw</span> std::runtime_error(<span class="code-string">"杨辉三角行数不能为负数"</span>);
+        stack.push_back(std::pow(<span class="code-number">2</span>, n));    <span class="code-comment">// 返回杨辉三角第n行的和（2^n）</span>
+    }
+
+<span class="code-keyword">public</span>:
+    <span class="code-function">RPNCalculator</span>() {
+        initializeOperations();
+    }
+
+    <span class="code-type">void</span> <span class="code-function">push</span>(<span class="code-type">double</span> value) {
+        stack.push_back(value);
+    }
+
+    <span class="code-type">double</span> <span class="code-function">pop</span>() {
+        <span class="code-keyword">if</span> (stack.empty())
+        {    <span class="code-keyword">throw</span> std::runtime_error(<span class="code-string">"栈为空，无法弹出元素"</span>);    }
+        <span class="code-type">double</span> value = stack.back();
+        stack.pop_back();
+        <span class="code-keyword">return</span> value;
+    }
+
+    <span class="code-type">void</span> <span class="code-function">calculate</span>(<span class="code-keyword">const</span> std::string& input) {  <span class="code-comment">//将获取的数据放入栈中，主函数直接调用</span>
+        std::istringstream iss(input);
+        std::string token;
+
+        <span class="code-keyword">while</span> (iss >> token) {            
+            <span class="code-keyword">if</span> (std::istringstream(token) >> std::ws, std::isdigit(token[<span class="code-number">0</span>]) ||
+                (token[<span class="code-number">0</span>] == <span class="code-string">'-'</span> && token.length() &gt; <span class="code-number">1</span> && std::isdigit(token[<span class="code-number">1</span>])) ||
+                (token[<span class="code-number">0</span>] == <span class="code-string">'.'</span> && token.length() &gt; <span class="code-number">1</span> && std::isdigit(token[<span class="code-number">1</span>])))
+            {   <span class="code-comment">// 检查是否为数字</span>
+                <span class="code-keyword">try</span> {
+                    <span class="code-type">double</span> value = std::stod(token);
+                    push(value);
+                } <span class="code-keyword">catch</span> (<span class="code-keyword">const</span> std::exception& e)
+                {    <span class="code-keyword">throw</span> std::runtime_error(<span class="code-string">"无效的数字格式: "</span> + token);    }
+            } <span class="code-keyword">else</span> <span class="code-keyword">if</span> (operations.find(token) != operations.end()) {  <span class="code-comment">// 检查是否为合法操作符</span>
+                <span class="code-keyword">try</span> {
+                    operations[token]();    <span class="code-comment">//调用计算函数</span>
+                } <span class="code-keyword">catch</span> (<span class="code-keyword">const</span> std::exception& e) {
+                    <span class="code-keyword">throw</span> std::runtime_error(<span class="code-string">"计算错误: "</span> + std::string(e.what()));
+                }
+            } <span class="code-keyword">else</span> {  <span class="code-keyword">throw</span> std::runtime_error(<span class="code-string">"未知的操作符: "</span> + token);   }
+        }    
+        history.push_back(input);       <span class="code-comment">// 记录历史</span>
+    }
+
+    <span class="code-type">void</span> <span class="code-function">displayStack</span>() <span class="code-keyword">const</span> {     <span class="code-comment">// 显示栈内数据，主函数直接调用</span>
+        std::cout &lt;&lt; <span class="code-string">"当前栈: "</span>;
+        <span class="code-keyword">if</span> (stack.empty()){
+            std::cout &lt;&lt; <span class="code-string">"空"</span>;
+        } <span class="code-keyword">else</span> {
+            <span class="code-keyword">for</span> (size_t i = <span class="code-number">0</span>; i &lt; stack.size(); i++) {
+                std::cout &lt;&lt; std::fixed &lt;&lt; std::setprecision(<span class="code-number">6</span>) &lt;&lt; stack[i];
+                <span class="code-keyword">if</span> (i &lt; stack.size() - <span class="code-number">1</span>)   std::cout &lt;&lt; <span class="code-string">" "</span>;
+            }
+        } std::cout &lt;&lt; std::endl;
+    }
+
+    <span class="code-type">void</span> <span class="code-function">displayHistory</span>() <span class="code-keyword">const</span> {   <span class="code-comment">//输出计算历史，主函数直接调用</span>
+        std::cout &lt;&lt; <span class="code-string">"计算历史:"</span> &lt;&lt; std::endl;
+        <span class="code-keyword">for</span> (size_t i = <span class="code-number">0</span>; i &lt; history.size(); i++)
+        {   std::cout &lt;&lt; i + <span class="code-number">1</span> &lt;&lt; <span class="code-string">": "</span> &lt;&lt; history[i] &lt;&lt; std::endl;    }
+    }
+
+    <span class="code-type">double</span> <span class="code-function">getResult</span>() <span class="code-keyword">const</span> {      <span class="code-comment">//从栈顶取出数据，主函数直接调用</span>
+        <span class="code-keyword">if</span> (stack.empty()) {        <span class="code-comment">//由于计算过程中会将结果放回栈顶，故可等同于返回结果</span>
+            <span class="code-keyword">throw</span> std::runtime_error(<span class="code-string">"栈为空"</span>);
+        } <span class="code-keyword">return</span> stack.back();
+    }
+
+    <span class="code-type">void</span> <span class="code-function">clearStack</span>() {             <span class="code-comment">//清空栈，主函数直接调用</span>
+        stack.clear();
+    }
+
+    size_t <span class="code-function">getStackSize</span>() <span class="code-keyword">const</span> {   <span class="code-comment">//统计栈内数据个数</span>
+        <span class="code-keyword">return</span> stack.size();
+    }
+
+    <span class="code-keyword">const</span> std::vector&lt;std::string&gt;& <span class="code-function">getHistory</span>() <span class="code-keyword">const</span> {
+        <span class="code-keyword">return</span> history;
+    }
+
+    <span class="code-type">void</span> <span class="code-function">showHelp</span>() <span class="code-keyword">const</span> {         <span class="code-comment">//功能列表，主函数直接调用</span>
+        std::cout &lt;&lt; <span class="code-string">"基础操作:"</span> &lt;&lt; std::endl;
+        std::cout &lt;&lt; <span class="code-string">"  +, -, *, /  - 四则运算"</span> &lt;&lt; std::endl;
+        std::cout &lt;&lt; <span class="code-string">"  clear       - 清空栈"</span> &lt;&lt; std::endl;
+        std::cout &lt;&lt; <span class="code-string">"  dup         - 复制栈顶元素"</span> &lt;&lt; std::endl;
+        std::cout &lt;&lt; <span class="code-string">"  swap        - 交换栈顶两个元素"</span> &lt;&lt; std::endl;
+        std::cout &lt;&lt; <span class="code-string">"  drop        - 删除栈顶元素"</span> &lt;&lt; std::endl;
+        std::cout &lt;&lt; std::endl;
+        std::cout &lt;&lt; <span class="code-string">"高级数学运算:"</span> &lt;&lt; std::endl;
+        std::cout &lt;&lt; <span class="code-string">"  sqrt        - 平方根"</span> &lt;&lt; std::endl;
+        std::cout &lt;&lt; <span class="code-string">"  pow         - 幂运算"</span> &lt;&lt; std::endl;
+        std::cout &lt;&lt; <span class="code-string">"  sin, cos, tan - 三角函数"</span> &lt;&lt; std::endl;
+        std::cout &lt;&lt; std::endl;
+        std::cout &lt;&lt; <span class="code-string">"特殊操作符:"</span> &lt;&lt; std::endl;
+        std::cout &lt;&lt; <span class="code-string">"  fib n       - 计算第n个斐波那契数"</span> &lt;&lt; std::endl;
+        std::cout &lt;&lt; <span class="code-string">"  pascal n    - 计算杨辉三角第n行的和"</span> &lt;&lt; std::endl;
+        std::cout &lt;&lt; std::endl;
+        std::cout &lt;&lt; <span class="code-string">"其他命令:"</span> &lt;&lt; std::endl;
+        std::cout &lt;&lt; <span class="code-string">"  stack       - 显示当前栈"</span> &lt;&lt; std::endl;
+        std::cout &lt;&lt; <span class="code-string">"  history     - 显示计算历史"</span> &lt;&lt; std::endl;
+        std::cout &lt;&lt; <span class="code-string">"  help        - 显示此帮助"</span> &lt;&lt; std::endl;
+        std::cout &lt;&lt; <span class="code-string">"  q           - 退出程序"</span> &lt;&lt; std::endl;
+    }
+};
+
+<span class="code-type">int</span> <span class="code-function">main</span>() {
+    RPNCalculator calc;
+    std::string input;
+
+    std::cout &lt;&lt; <span class="code-string">"C++ RPN 计算器"</span> &lt;&lt; std::endl;
+    std::cout &lt;&lt; <span class="code-string">"输入表达式 (例: '5 5 +'), 或 'help' 查看帮助, 'q' 退出."</span> &lt;&lt; std::endl;
+
+    <span class="code-keyword">while</span> (<span class="code-keyword">true</span>) {
+        std::cout &lt;&lt; <span class="code-string">"请选择操作或输入数据："</span>;
+        std::getline(std::cin, input);
+
+        <span class="code-keyword">if</span> (input == <span class="code-string">"q"</span> || input == <span class="code-string">"quit"</span>) {
+            <span class="code-keyword">break</span>;
+        } <span class="code-keyword">else</span> <span class="code-keyword">if</span> (input == <span class="code-string">"help"</span>) {
+            calc.showHelp();
+        } <span class="code-keyword">else</span> <span class="code-keyword">if</span> (input == <span class="code-string">"stack"</span>) {
+            calc.displayStack();
+        } <span class="code-keyword">else</span> <span class="code-keyword">if</span> (input == <span class="code-string">"history"</span>) {
+            calc.displayHistory();
+        } <span class="code-keyword">else</span> <span class="code-keyword">if</span> (input.empty()) {
+            <span class="code-keyword">continue</span>;
+        } <span class="code-keyword">else</span> {
+            <span class="code-keyword">try</span> {
+                calc.calculate(input);
+                <span class="code-keyword">if</span> (calc.getStackSize() &gt; <span class="code-number">0</span>)    <span class="code-comment">//fixed:设置定点格式输出浮点数    setprecision:设置浮点数的有效位数</span>
+                    std::cout &lt;&lt; <span class="code-string">"结果: "</span> &lt;&lt; std::fixed &lt;&lt; std::setprecision(<span class="code-number">6</span>) &lt;&lt; calc.getResult() &lt;&lt; std::endl;
+            } <span class="code-keyword">catch</span> (<span class="code-keyword">const</span> std::exception& e) {
+                std::cout &lt;&lt; <span class="code-string">"错误: "</span> &lt;&lt; e.what() &lt;&lt; std::endl;
+            }
+        }
+    }std::cout &lt;&lt; <span class="code-string">"已退出程序"</span> &lt;&lt; std::endl;
+    <span class="code-keyword">return</span> <span class="code-number">0</span>;
+}</pre>
+            </div>
+        </section>
+
+        <!-- 代码说明 -->
+        <section class="content-section">
+            <h2 class="text-2xl font-bold mb-4 text-primary">
+                <i class="fa fa-info-circle mr-2"></i>代码说明
+            </h2>
+            <div class="space-y-4">
+                <div>
+                    <h3 class="font-bold text-lg mb-2">RPN计算器原理</h3>
+                    <p class="text-gray-700">逆波兰表示法（Reverse Polish Notation，RPN）是一种数学表达式表示法，其中运算符位于操作数之后。例如，表达式 "3 4 +" 相当于传统表示法的 "3 + 4"。</p>
+                </div>
+                <div>
+                    <h3 class="font-bold text-lg mb-2">实现特点</h3>
+                    <ul class="list-disc pl-5 text-gray-700 space-y-2">
+                        <li>使用std::vector作为栈结构存储操作数</li>
+                        <li>通过std::map和std::function实现操作符到函数的映射</li>
+                        <li>支持多种数学运算和栈操作</li>
+                        <li>包含完善的错误处理机制</li>
+                        <li>记录计算历史，便于回溯</li>
+                    </ul>
+                </div>
+                <div>
+                    <h3 class="font-bold text-lg mb-2">使用方法</h3>
+                    <p class="text-gray-700">输入表达式时，操作数和操作符之间用空格分隔。例如：</p>
+                    <div class="bg-gray-100 p-3 rounded mt-2 font-mono">
+                        <p>5 5 + → 计算 5 + 5</p>
+                        <p>10 2 / → 计算 10 / 2</p>
+                        <p>9 sqrt → 计算 √9</p>
+                        <p>5 fib → 计算斐波那契数列第5项</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- 页脚 -->
+    <footer class="bg-dark text-white py-6 mt-8">
+        <div class="container mx-auto px-4 text-center">
+            <p>C++ RPN计算器代码展示</p>
+            <p class="text-gray-400 mt-2">使用C++实现的逆波兰表示法计算器</p>
+        </div>
+    </footer>
+</body>
+</html>
